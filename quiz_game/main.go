@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 var problems map[string]int
+var timeLimit *int
 
 func main() {
 	csvFilename := flag.String("csv", "problems.csv", "A csv file in the format of 'question,answer'")
+	timeLimit = flag.Int("time", 30, "the time limit for the quiz")
 	flag.Parse()
 	loadCSVfile(csvFilename)
 }
@@ -48,12 +51,24 @@ func parseCSVfile(file *os.File) (map[string]int, error) {
 
 func startGame(problems map[string]int) {
 	var index, count int
+	timer := time.NewTimer(time.Duration(*timeLimit) * time.Second)
+	inputChannel := make(chan int)
 	for ques, ans := range problems {
-		var userAns int
 		fmt.Printf("Question #%02d : %6s = ", index+1, ques)
-		fmt.Scanf("%d\n", &userAns)
-		if userAns == ans {
-			count++
+		go func() {
+			var userAns int
+			fmt.Scanf("%d\n", &userAns)
+			inputChannel <- userAns
+		}()
+		select {
+		case <-timer.C:
+			fmt.Printf("\nTime limit exceeded.")
+			fmt.Printf("\nYou have answered %d questions correctly out of %d.\n", count, len(problems))
+			return
+		case userAns := <-inputChannel:
+			if userAns == ans {
+				count++
+			}
 		}
 		index++
 	}
